@@ -3,6 +3,7 @@ import requests
 from pprint import pprint
 import time
 from progress import print_progress_bar
+import json
 
 # APP_ID = 6784110
 # AUTH_URL = 'https://oauth.vk.com/authorize?'
@@ -18,7 +19,7 @@ from progress import print_progress_bar
 # print(AUTH_URL + urlencode(auth_data))
 
 
-TOKEN = '175d8d9b43c44d0fe9d781082ae5aa23e3c07e3f5a45ac88f3011d6268bf9a563559aa62f9b36106003e0'
+TOKEN = 'f39396467a3268f80f7f949759413d52d11a40a0bc8eade9053138bd29a45c1246bddbdb9e66f78855fb3'
 USER_ID = '171691064'
 
 
@@ -68,6 +69,25 @@ class User:
         return string
 
 
+class Group:
+
+    def get_info(self):
+        access_data = {
+            'access_token': TOKEN,
+            'v': '5.92',
+            'group_id': self.id,
+            'fields': 'members_count'
+        }
+        response = requests.get(f'https://api.vk.com/method/groups.getById?', urlencode(access_data))
+        return response.json()
+
+    def __init__(self, id):
+        self.id = id
+        info = self.get_info()
+        self.name = info['response'][0]['name']
+        self.members_count = info['response'][0]['members_count']
+
+
 class SpyGame:
 
     def add_friends(self):
@@ -77,30 +97,52 @@ class SpyGame:
         list_len = len(friend_id_list)
         print(f'Запущен процесс получения информации о '
               f'друзьях пользователя {self.victim.name} {self.victim.last_name}:')
-        print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=50)
+        print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
 
         for counter, friend_id in enumerate(friend_id_list):
             friend = User(friend_id)
             friend_list.append(friend)
             time.sleep(0.8)
-            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=50)
-            if len(friend_list) == 5:
-                return friend_list
+            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=30)
+        print('Данные получены!')
+        return friend_list
+
+
+    def get_result_set(self, group_list, groups_set):
+        victim_group_set = set(group_list)
+        return victim_group_set.difference(groups_set)
+
+    def get_groups_data(self, groups_set):
+        print('Запущен анализ результирующего списка групп:')
+        list_len = len(groups_set)
+        result_group_list = []
+
+        print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
+        for counter, group_id in enumerate(groups_set):
+            group = Group(group_id)
+            result_group_list.append(group.__dict__)
+            time.sleep(0.8)
+            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=30)
+        return result_group_list
 
     def __init__(self, victim):
         self.victim = victim
+        self.victim_group_list = victim.group_list
         self.friend_list = self.add_friends()
 
+        groups = [friend.group_list for friend in self.friend_list]
+        groups = [item for row in groups for item in row]  # Делаем плоский массив двойным перебором значений
+        self.friends_groups_set = set(groups)
+
+        self.result_set = self.get_result_set(self.victim_group_list, self.friends_groups_set)
+
+        self.result_json = self.get_groups_data(self.result_set)
 
 
-user = User(USER_ID, True)
-game = SpyGame(user)
-
-for friend in game.friend_list:
-    pprint(friend.__dict__)
-
-
-
-
-
-
+if __name__ == '__main__':
+    user = User(USER_ID, True)
+    game = SpyGame(user)
+    file_name = 'data.json'
+    with open(file_name, 'w') as outfile:
+        json.dump(game.result_json, outfile)
+    print(f'Анализ завершен, данные сохранены в {file_name}')
