@@ -5,22 +5,34 @@ import time
 from progress import print_progress_bar
 import json
 
-# APP_ID = 6784110
-# AUTH_URL = 'https://oauth.vk.com/authorize?'
-# auth_data = {
-#     'client_id':                  APP_ID,
-#     'display':                    'page',
-#     'redirect_uri':               'https://vk.com',
-#     'scope':                      'friends, groups',
-#     'response_type':              'token',
-#     'v':                          '5.92'
-# }
-#
-# print(AUTH_URL + urlencode(auth_data))
+API_TOKEN = '9c3fb3a79e09ab541e3f69f5a618c0d4cca6089b1b16d4c4bd77566b0e73d53d8ac2740e5f02a3e02b4e4'
+USER_ID = '171691064'
+VERSION = '5.92'
+APP_ID = 6784110
+AUTH_URL = 'https://oauth.vk.com/authorize?'
+AUTH_DATA = {
+    'client_id': APP_ID,
+    'display': 'page',
+    'redirect_uri': 'https://vk.com',
+    'scope': 'friends, groups',
+    'response_type': 'token',
+    'v': VERSION
+    }
 
 
-TOKEN = '5564ebc5f3e1b959c70402ad8be63d6ee7a1284ad134184bd93aaeecd042885319d6c4f4e019e355ae5e2'
-USER_ID = '232001259'
+def check_token(token):
+    access_data = {
+        'access_token': token,
+        'v': VERSION,
+        'user_id': USER_ID
+    }
+    response = requests.get(f'https://api.vk.com/method/users.get?', urlencode(access_data))
+    user_info = response.json()
+    try:
+        name = user_info['response'][0]['first_name']
+        return True
+    except KeyError:
+        return False
 
 
 class User:
@@ -28,8 +40,8 @@ class User:
     def __init__(self, id, get_friends=False):
         self.id = id
         access_data = {
-            'access_token': TOKEN,
-            'v': '5.92',
+            'access_token': API_TOKEN,
+            'v': VERSION,
             'user_id': self.id
         }
         self.name, self.last_name = self.get_user_data(access_data)
@@ -82,8 +94,8 @@ class Group:
 
     def get_info(self):
         access_data = {
-            'access_token': TOKEN,
-            'v': '5.92',
+            'access_token': API_TOKEN,
+            'v': VERSION,
             'group_id': self.id,
             'fields': 'members_count'
         }
@@ -116,7 +128,7 @@ class SpyGame:
         try:
             print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
         except ZeroDivisionError:
-            print('Пользователь удален или у него нет друзей.')
+            print('Информация о друзьях недоступна.')
             return friend_list
 
         for counter, friend_id in enumerate(friend_id_list):
@@ -139,7 +151,7 @@ class SpyGame:
         try:
             print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
         except ZeroDivisionError:
-            print('Пользователь удален или у него нет групп.')
+            print('Информация о группах недоступна.')
             return result_group_list
 
         for counter, group_id in enumerate(groups_set):
@@ -151,9 +163,13 @@ class SpyGame:
 
 
 if __name__ == '__main__':
-    user = User(USER_ID, True)
-    game = SpyGame(user)
-    file_name = 'data.json'
-    with open(file_name, 'w') as outfile:
-        json.dump(game.result_json, outfile)
-    print(f'Анализ завершен, данные сохранены в {file_name}')
+    if check_token(API_TOKEN):
+        user = User(USER_ID, True)
+        game = SpyGame(user)
+        file_name = 'data.json'
+        with open(file_name, 'w') as outfile:
+            json.dump(game.result_json, outfile)
+        print(f'Анализ завершен, данные сохранены в {file_name}')
+    else:
+        print('\nЗамените токен, срок использования истек.\n')
+        print(AUTH_URL + urlencode(AUTH_DATA))
