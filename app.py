@@ -19,11 +19,25 @@ import json
 # print(AUTH_URL + urlencode(auth_data))
 
 
-TOKEN = 'f39396467a3268f80f7f949759413d52d11a40a0bc8eade9053138bd29a45c1246bddbdb9e66f78855fb3'
-USER_ID = '171691064'
+TOKEN = '5564ebc5f3e1b959c70402ad8be63d6ee7a1284ad134184bd93aaeecd042885319d6c4f4e019e355ae5e2'
+USER_ID = '232001259'
 
 
 class User:
+
+    def __init__(self, id, get_friends=False):
+        self.id = id
+        access_data = {
+            'access_token': TOKEN,
+            'v': '5.92',
+            'user_id': self.id
+        }
+        self.name, self.last_name = self.get_user_data(access_data)
+
+        self.group_list = self.get_group_list(access_data)
+
+        if get_friends:
+            self.friend_list = self.get_friends(access_data)
 
     def api_request(self, method, data):
         response = requests.get(f'https://api.vk.com/method/{method}.get?', urlencode(data))
@@ -50,26 +64,21 @@ class User:
             group_list = []
         return group_list
 
-    def __init__(self, id, get_friends=False):
-        self.id = id
-        access_data = {
-            'access_token': TOKEN,
-            'v': '5.92',
-            'user_id': self.id
-        }
-        self.name, self.last_name = self.get_user_data(access_data)
-
-        self.group_list = self.get_group_list(access_data)
-
-        if get_friends:
-            self.friend_list = self.get_friends(access_data)
-
     def __str__(self):
         string = f'ID: {self.id}\nИмя: {self.name}\nФамилия: {self.last_name}\n***\n'
         return string
 
 
 class Group:
+
+    def __init__(self, id):
+        self.id = id
+        info = self.get_info()
+        self.name = info['response'][0]['name']
+        try:
+            self.members_count = info['response'][0]['members_count']
+        except KeyError:
+            self.members_count = 'Информация скрыта'
 
     def get_info(self):
         access_data = {
@@ -81,49 +90,8 @@ class Group:
         response = requests.get(f'https://api.vk.com/method/groups.getById?', urlencode(access_data))
         return response.json()
 
-    def __init__(self, id):
-        self.id = id
-        info = self.get_info()
-        self.name = info['response'][0]['name']
-        self.members_count = info['response'][0]['members_count']
-
 
 class SpyGame:
-
-    def add_friends(self):
-        friend_list = []
-        friend_id_list = self.victim.friend_list
-
-        list_len = len(friend_id_list)
-        print(f'Запущен процесс получения информации о '
-              f'друзьях пользователя {self.victim.name} {self.victim.last_name}:')
-        print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
-
-        for counter, friend_id in enumerate(friend_id_list):
-            friend = User(friend_id)
-            friend_list.append(friend)
-            time.sleep(0.8)
-            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=30)
-        print('Данные получены!')
-        return friend_list
-
-
-    def get_result_set(self, group_list, groups_set):
-        victim_group_set = set(group_list)
-        return victim_group_set.difference(groups_set)
-
-    def get_groups_data(self, groups_set):
-        print('Запущен анализ результирующего списка групп:')
-        list_len = len(groups_set)
-        result_group_list = []
-
-        print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
-        for counter, group_id in enumerate(groups_set):
-            group = Group(group_id)
-            result_group_list.append(group.__dict__)
-            time.sleep(0.8)
-            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=30)
-        return result_group_list
 
     def __init__(self, victim):
         self.victim = victim
@@ -137,6 +105,49 @@ class SpyGame:
         self.result_set = self.get_result_set(self.victim_group_list, self.friends_groups_set)
 
         self.result_json = self.get_groups_data(self.result_set)
+
+    def add_friends(self):
+        friend_list = []
+        friend_id_list = self.victim.friend_list
+
+        list_len = len(friend_id_list)
+        print(f'Запущен процесс получения информации о '
+              f'друзьях пользователя {self.victim.name} {self.victim.last_name}:')
+        try:
+            print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
+        except ZeroDivisionError:
+            print('Пользователь удален или у него нет друзей.')
+            return friend_list
+
+        for counter, friend_id in enumerate(friend_id_list):
+            friend = User(friend_id)
+            friend_list.append(friend)
+            time.sleep(0.8)
+            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=30)
+        print('Данные получены!')
+        return friend_list
+
+    def get_result_set(self, group_list, groups_set):
+        victim_group_set = set(group_list)
+        return victim_group_set.difference(groups_set)
+
+    def get_groups_data(self, groups_set):
+        print('Запущен анализ результирующего списка групп:')
+        list_len = len(groups_set)
+        result_group_list = []
+
+        try:
+            print_progress_bar(0, list_len, prefix='Прогресс:', suffix='', length=30)
+        except ZeroDivisionError:
+            print('Пользователь удален или у него нет групп.')
+            return result_group_list
+
+        for counter, group_id in enumerate(groups_set):
+            group = Group(group_id)
+            result_group_list.append(group.__dict__)
+            time.sleep(0.8)
+            print_progress_bar(counter + 1, list_len, prefix='Прогресс:', suffix='', length=30)
+        return result_group_list
 
 
 if __name__ == '__main__':
